@@ -22,6 +22,8 @@ import com.inventorymanagement.repository.PasswordResetOtpRepository;
 public class AuthService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String DEMO_ADMIN_USERNAME = "admin";
+    private static final String DEMO_ADMIN_PASSWORD = "1234";
     private final InventoryUserRepository users;
     private final PasswordResetOtpRepository otps;
     private final PasswordEncoder passwordEncoder;
@@ -40,19 +42,19 @@ public class AuthService {
 
     @Transactional
     public AuthDto.AuthResponse signup(AuthDto.SignupRequest request) {
-        String email = normalizeEmail(request.email());
-        if (users.existsByEmailIgnoreCase(email)) throw new ConflictException("An account already exists for that email");
-        InventoryUser user = new InventoryUser();
-        user.setName(request.name().trim());
-        user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole("OPERATOR");
-        user.setCreatedAt(LocalDateTime.now());
-        return tokenResponse(users.save(user));
+        throw new ConflictException("Account registration is disabled until database-backed user setup is configured");
     }
 
     @Transactional(readOnly = true)
     public AuthDto.AuthResponse login(AuthDto.LoginRequest request) {
+        if (DEMO_ADMIN_USERNAME.equalsIgnoreCase(request.email().trim())
+                && DEMO_ADMIN_PASSWORD.equals(request.password())) {
+            return new AuthDto.AuthResponse(jwtService.createToken(DEMO_ADMIN_USERNAME),
+                    new AuthDto.UserDto(0L, "Demo Administrator", DEMO_ADMIN_USERNAME, "INVENTORY_MANAGER"));
+        }
+        if (!request.email().contains("@")) {
+            throw new BadCredentialsException("Invalid login ID or password");
+        }
         InventoryUser user = users.findByEmailIgnoreCase(normalizeEmail(request.email()))
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -63,12 +65,18 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthDto.UserDto currentUser(String email) {
+        if (DEMO_ADMIN_USERNAME.equalsIgnoreCase(email)) {
+            return new AuthDto.UserDto(0L, "Demo Administrator", DEMO_ADMIN_USERNAME, "INVENTORY_MANAGER");
+        }
         return toUser(users.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found")));
     }
 
     @Transactional
     public AuthDto.UserDto updateProfile(String email, AuthDto.UpdateProfileRequest request) {
+        if (DEMO_ADMIN_USERNAME.equalsIgnoreCase(email)) {
+            throw new ConflictException("The built-in demo administrator profile is fixed");
+        }
         InventoryUser user = users.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
         if (request.name() != null && !request.name().isBlank()) user.setName(request.name().trim());

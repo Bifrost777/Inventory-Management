@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "6af2aafa-4059-4a76-87f8-2019507472b1",
     "name": "Stockroom Inventory API",
-    "description": "End-to-end requests for every endpoint shown in the Stockroom architecture diagram. Run in order against the local demo profile. OTP reset-code auto-capture requires OTP_EXPOSE_CODE=true and is for local demos only.",
+    "description": "End-to-end API requests for Stockroom. The local auth flow uses the built-in single-user demo account (admin/1234). Signup/profile changes are expected conflicts; password reset is unavailable for this non-persisted account until user storage and email delivery are configured.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -12,10 +12,8 @@
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
     { "key": "token", "value": "" },
-    { "key": "email", "value": "" },
-    { "key": "password", "value": "StockroomDemo123!" },
-    { "key": "resetPassword", "value": "StockroomReset123!" },
-    { "key": "otp", "value": "" },
+    { "key": "email", "value": "admin" },
+    { "key": "password", "value": "1234" },
     { "key": "categoryId", "value": "" },
     { "key": "warehouseId", "value": "" },
     { "key": "locationId", "value": "" },
@@ -60,12 +58,11 @@
       "name": "Auth",
       "item": [
         {
-          "name": "POST signup",
+          "name": "POST signup disabled until database setup",
           "event": [
-            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('email', 'stockroom.' + Date.now() + '@example.test');"] } },
-            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Signup created a user and token', function () { pm.response.to.have.status(201); const d = pm.response.json().data; pm.expect(d.user.id).to.exist; pm.collectionVariables.set('token', d.token); });"] } }
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Signup is intentionally disabled for the single-user demo', function () { pm.response.to.have.status(409); });"] } }
           ],
-          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Stockroom Demo\",\"email\":\"{{email}}\",\"password\":\"{{password}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/signup" }
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Another User\",\"email\":\"another@example.test\",\"password\":\"StockroomDemo123!\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/signup" }
         },
         {
           "name": "POST login",
@@ -73,18 +70,13 @@
           "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/login" }
         },
         { "name": "GET current user", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" } },
-        { "name": "PUT update current profile", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Stockroom Demo Manager\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/me" } },
+        { "name": "PUT update current profile (fixed demo profile)", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Built-in demo profile is fixed', function () { pm.response.to.have.status(409); });"] } }], "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Changed Demo Manager\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/me" } },
         {
-          "name": "POST request password-reset OTP",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const body = pm.response.json().data; if (body.debug_otp) pm.collectionVariables.set('otp', body.debug_otp); pm.test('OTP request accepted', function () { pm.response.to.have.status(200); });"] } }],
-          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/otp/request" }
+          "name": "POST request password-reset OTP (no persisted admin account)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('OTP request does not reveal account existence', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.debug_otp).to.not.exist; });"] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"admin@example.test\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/otp/request" }
         },
-        { "name": "POST verify OTP and reset password", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"otp\":\"{{otp}}\",\"new_password\":\"{{resetPassword}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/otp/verify" } },
-        {
-          "name": "POST login with reset password",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reset password login succeeds', function () { pm.response.to.have.status(200); pm.collectionVariables.set('token', pm.response.json().data.token); pm.collectionVariables.set('password', pm.collectionVariables.get('resetPassword')); });"] } }],
-          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{resetPassword}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/login" }
-        }
+        { "name": "POST verify OTP unavailable for built-in account", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reset requires a persisted user and delivered OTP', function () { pm.response.to.have.status(401); });"] } }], "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"admin@example.test\",\"otp\":\"000000\",\"new_password\":\"StockroomReset123!\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/otp/verify" } }
       ]
     },
     {
@@ -94,7 +86,7 @@
         {
           "name": "POST create category",
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Category created', function () { pm.response.to.have.status(201); pm.collectionVariables.set('categoryId', pm.response.json().data.id); });"] } }],
-          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Demo Supplies\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/categories" }
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"name\":\"Demo Supplies {{timestamp}}\"}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/categories" }
         },
         { "name": "GET category by ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/categories/{{categoryId}}" } }
       ]

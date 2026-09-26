@@ -25,34 +25,33 @@ Stockroom is a warehouse inventory dashboard concept built for teams that need a
 | **Inventory overview** | Stock-on-hand, inventory value, low-stock count, and open-operation summary metrics. |
 | **Stock movement** | A weekly received-versus-shipped chart and net movement summary. |
 | **Replenishment watch** | Reorder thresholds and visual stock-level indicators for items needing attention. |
-| **Product inventory** | Searchable sample catalog with SKU, category, quantity, warehouse location, and unit cost. |
-| **Quick actions** | Add a product or record a receipt/delivery and see the in-session inventory update. |
-| **Warehouse workspace** | Responsive navigation, warehouse context, reports, locations, and settings entry points. |
 
 ### Demo Flow
 
-1. Start the web app and scan the four overview metrics.
-2. Search by product name, SKU, or bin location to narrow the catalog.
-3. Choose **Add product** to add an item to the current demo session.
-4. Choose **Record movement** to receive or dispatch units and see the on-hand count change.
+1. Sign in as `admin` with password `1234`.
+2. Review stock metrics and low-stock alerts on the dashboard.
+3. Search the Products page and create a product through the API.
+4. Use Operations to draft and validate receipts, deliveries, transfers, or adjustments; review posted movements in the Ledger.
 
-> **Demo scope:** dashboard metrics and catalog entries are illustrative sample data held in browser state. The frontend has not yet been connected to the API, so its quick-action changes are not persisted. The Spring backend now exposes the inventory, warehouse, stock-ledger, document, dashboard, and JWT authentication APIs described below.
+> **Demo scope:** the frontend reads inventory, warehouse, and document data from the Spring API. Weekly movement bars remain illustrative because no analytics endpoint exists yet. The login accepts one hardcoded local demo administrator; see **Demo Login** below. Signup is disabled until database-backed user management is configured.
+
+### Demo Login
+
+Use **Login ID** `admin` and **Password** `1234`. When the backend is reachable, login returns a signed JWT for the demo administrator. When the backend is unavailable, the frontend permits a local-only demo session so the UI can still be explored. This hardcoded credential is temporary and must not be used in a deployed environment. Signup and profile changes are intentionally disabled for this single-user setup.
 
 ## How It Fits Together
 
 ```mermaid
 flowchart LR
 		operator[Warehouse operator] --> ui[Next.js dashboard]
-		ui --> demo[Sample inventory state<br/>in the browser]
-		ui -. planned API integration .-> api[Spring Boot REST API]
-		api --> health[GET /api/health]
-		api -. configured for .-> db[(PostgreSQL)]
+		ui -->|JWT bearer requests| api[Spring Boot REST API]
+		api -->|JPA and Flyway| db[(PostgreSQL)]
+		api -. local demo profile .-> h2[(H2 in-memory database)]
 ```
 
 The codebase is split into a TypeScript frontend and a Java backend. PostgreSQL schema is versioned with Flyway; stock receipts, deliveries, transfers, and adjustments are recorded through a transactional stock ledger. Local demo runs can use the H2 test database.
 
 ## Technology
-
 | Layer | Stack |
 | --- | --- |
 | Web | Next.js 16, React 19, TypeScript |
@@ -114,57 +113,31 @@ $env:JWT_SECRET = "replace-with-a-random-secret-at-least-32-characters"
 .\gradlew.bat bootRun
 ```
 
-For an isolated local demo that needs no PostgreSQL credentials, run `.\gradlew.bat bootTestRun` from `backend/`. It uses H2 and exposes a reset OTP in the response for the local Postman sequence; do not enable OTP code exposure outside a local demo.
+For an isolated local demo that needs no PostgreSQL credentials, run ` .\gradlew.bat bootTestRun` from `backend/`. It uses H2. The built-in administrator has no database user row, so OTP password reset is not available for that account. Configure persistent users and email delivery before enabling signup or password reset.
 
-Check the starter endpoint:
+Check the API health endpoint:
 
 ```powershell
 Invoke-RestMethod http://localhost:8080/api/health
 ```
 
-Expected response:
-
-```json
-{
-	"success": true,
-	"data": {
-		"status": "UP",
-		"service": "inventory-management-api"
-	}
-}
-```
-
 ### Postman
 
-Import [Stockroom.postman_collection.json](backend/postman/Stockroom.postman_collection.json) into Postman. Start the backend with `.\gradlew.bat bootTestRun` for the self-contained demo sequence, then run the collection in order. It creates a temporary user and sample records, carries the JWT and generated IDs between requests, and exercises all API groups. It ends by soft-deleting its demo product.
+Import [Stockroom.postman_collection.json](backend/postman/Stockroom.postman_collection.json) into Postman. Start the backend with ` .\gradlew.bat bootTestRun`, then run the collection in order. It signs in as the demo administrator, checks the expected signup/profile restrictions, exercises the inventory API groups, and soft-deletes its demo product.
 
-## A Peek at the Implementation
+## Frontend Routes
 
-The add-product interaction validates the submitted values and updates the visible demo catalog immediately:
-
-```tsx
-function addProduct(formData: FormData) {
-	const name = String(formData.get("name") ?? "").trim();
-	const sku = String(formData.get("sku") ?? "").trim();
-	const quantity = Number(formData.get("quantity"));
-	if (!name || !sku || !Number.isFinite(quantity)) return;
-
-	setItems((current) => [
-		{ name, sku, quantity, category: "New item", reorderAt: 10,
-			location: "Unassigned", value: 0 },
-		...current,
-	]);
-}
-```
-
-The health endpoint follows the common response envelope:
-
-```java
-@GetMapping("/health")
-public ApiResponse<Map<String, String>> health() {
-    return ApiResponse.ok(Map.of("status", "UP", "service", "inventory-management-api"));
-}
-```
+| Route | Purpose |
+| --- | --- |
+| `/login` | Demo admin sign-in; signup is disabled pending persistent user setup. |
+| `/` | API-backed inventory dashboard and low-stock watch. |
+| `/products` | Search, filter, and create products. |
+| `/operations/receipts` | Draft and validate incoming stock receipts. |
+| `/operations/deliveries` | Draft and validate outgoing stock deliveries. |
+| `/operations/transfers` | Move stock between warehouse locations. |
+| `/operations/adjustments` | Record inventory gain or loss adjustments. |
+| `/operations/ledger` | Search posted stock movements. |
+| `/settings/warehouses` | Create warehouses and physical locations. |
 
 ## Verify
 
@@ -208,7 +181,6 @@ Inventory-Management/
 
 ## Next Up
 
-- Connect the dashboard to the Spring API and replace sample browser state with persisted data.
-- Configure real email delivery for password-reset OTPs; the local demo can expose a one-time code only when explicitly enabled.
+- Configure persistent user accounts and email delivery before enabling signup and password reset.
 - Add role-based permissions beyond the current authenticated-request boundary.
 - Add automated workflow tests to the Gradle suite so the full Postman scenarios run in CI.
