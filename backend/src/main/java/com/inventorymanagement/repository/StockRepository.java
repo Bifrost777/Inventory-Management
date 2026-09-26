@@ -22,4 +22,11 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     @Query("select coalesce(sum(s.quantity), 0) from Stock s where s.product.id = :productId and s.location.virtual = false")
     BigDecimal sumQuantityByProductId(@Param("productId") Long productId);
+
+    @Query("select coalesce(sum(s.quantity), 0) from Stock s where s.location.virtual = false")
+    BigDecimal sumAllPhysicalQuantity();
+
+    @Query("select coalesce(sum(s.quantity * s.product.perUnitCost), 0) from Stock s "
+            + "where s.location.virtual = false and s.product.deletedAt is null")
+    BigDecimal sumInventoryValue();
 }

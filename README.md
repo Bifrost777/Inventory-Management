@@ -36,7 +36,7 @@ Stockroom is a warehouse inventory dashboard concept built for teams that need a
 3. Choose **Add product** to add an item to the current demo session.
 4. Choose **Record movement** to receive or dispatch units and see the on-hand count change.
 
-> **Demo scope:** all dashboard metrics and catalog entries are illustrative sample data held in browser state. Add-product and stock-movement changes last only for the current session and are not persisted after a refresh. The frontend is not yet connected to the Spring API. The backend currently exposes a health endpoint; PostgreSQL configuration is in place for the next implementation phase.
+> **Demo scope:** dashboard metrics and catalog entries are illustrative sample data held in browser state. The frontend has not yet been connected to the API, so its quick-action changes are not persisted. The Spring backend now exposes the inventory, warehouse, stock-ledger, document, dashboard, and JWT authentication APIs described below.
 
 ## How It Fits Together
 
@@ -49,7 +49,7 @@ flowchart LR
 		api -. configured for .-> db[(PostgreSQL)]
 ```
 
-The codebase is split into a TypeScript frontend and a Java backend. The backend is organized around the planned inventory boundaries: products, warehouses and locations, receipts, deliveries, transfers, adjustments, stock ledger, users, and dashboard summaries.
+The codebase is split into a TypeScript frontend and a Java backend. PostgreSQL schema is versioned with Flyway; stock receipts, deliveries, transfers, and adjustments are recorded through a transactional stock ledger. Local demo runs can use the H2 test database.
 
 ## Technology
 
@@ -58,8 +58,24 @@ The codebase is split into a TypeScript frontend and a Java backend. The backend
 | Web | Next.js 16, React 19, TypeScript |
 | UI | Responsive CSS, Lucide icons |
 | API | Java 17, Spring Boot 3.5, Spring Web |
-| Persistence foundation | Spring Data JPA, PostgreSQL driver |
-| Backend test | Spring Boot Test, H2 in-memory database |
+| Persistence | Spring Data JPA, Flyway migrations, PostgreSQL |
+| Authentication | Spring Security, BCrypt, signed JWT bearer tokens |
+| Backend test/demo | Gradle, Spring Boot Test, H2 in-memory database |
+
+## API Coverage
+
+The API uses `/api` as its base path. All responses use a `success` envelope; paginated resources include `items`, `page`, `limit`, `total`, and `total_pages`.
+
+| Module | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/signup`, `POST /auth/login`, `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /auth/me`, `PUT /auth/me` |
+| Products and categories | Product list/create/get/update/delete, product ledger, category list/create/get |
+| Warehouses and locations | Warehouse list/create/get, warehouse location creation, location list/create |
+| Stock ledger | `GET /ledger`, `POST /ledger/movement` |
+| Receipts, deliveries, transfers, adjustments | For each: list/create/get, validate, cancel |
+| Dashboard | `GET /dashboard/summary`, `GET /dashboard/documents` |
+
+For exact methods and request bodies, import [the Postman collection](backend/postman/Stockroom.postman_collection.json). The full module-by-module sequence is documented in [backend/postman/README.md](backend/postman/README.md).
 
 ## Run Locally
 
@@ -67,7 +83,7 @@ The codebase is split into a TypeScript frontend and a Java backend. The backend
 
 - Node.js 20.19+ or 22.13+ and npm
 - Java 17 or newer; the Gradle wrapper downloads the pinned Gradle distribution
-- PostgreSQL for running the API against the configured local database
+- PostgreSQL for the normal API run, or use the H2-backed demo/test runtime
 
 ### Frontend
 
@@ -81,21 +97,24 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Backend
 
-Create a PostgreSQL database named `inventory_management`, then run:
+For the normal API run, create a PostgreSQL database named `inventory_management`, configure credentials, and start the backend:
 
 ```powershell
 cd backend
 .\gradlew.bat bootRun
 ```
 
-The API uses port `8080`. Override the local database connection with environment variables when needed:
+The API listens on port `8080`. Configure a stable JWT signing secret and your local database credentials:
 
 ```powershell
 $env:DB_URL = "jdbc:postgresql://localhost:5432/inventory_management"
 $env:DB_USERNAME = "postgres"
 $env:DB_PASSWORD = "postgres"
+$env:JWT_SECRET = "replace-with-a-random-secret-at-least-32-characters"
 .\gradlew.bat bootRun
 ```
+
+For an isolated local demo that needs no PostgreSQL credentials, run `.\gradlew.bat bootTestRun` from `backend/`. It uses H2 and exposes a reset OTP in the response for the local Postman sequence; do not enable OTP code exposure outside a local demo.
 
 Check the starter endpoint:
 
@@ -107,10 +126,17 @@ Expected response:
 
 ```json
 {
-	"status": "UP",
-	"service": "inventory-management-api"
+	"success": true,
+	"data": {
+		"status": "UP",
+		"service": "inventory-management-api"
+	}
 }
 ```
+
+### Postman
+
+Import [Stockroom.postman_collection.json](backend/postman/Stockroom.postman_collection.json) into Postman. Start the backend with `.\gradlew.bat bootTestRun` for the self-contained demo sequence, then run the collection in order. It creates a temporary user and sample records, carries the JWT and generated IDs between requests, and exercises all API groups. It ends by soft-deleting its demo product.
 
 ## A Peek at the Implementation
 
@@ -131,12 +157,12 @@ function addProduct(formData: FormData) {
 }
 ```
 
-The Java starter keeps its health check small and explicit:
+The health endpoint follows the common response envelope:
 
 ```java
 @GetMapping("/health")
-public Map<String, String> health() {
-		return Map.of("status", "UP", "service", "inventory-management-api");
+public ApiResponse<Map<String, String>> health() {
+    return ApiResponse.ok(Map.of("status", "UP", "service", "inventory-management-api"));
 }
 ```
 
@@ -166,22 +192,23 @@ Inventory-Management/
 │       ├── store/              # Shared client state
 │       └── utils/              # Frontend helpers
 └── backend/
-		└── src/
-				├── main/java/com/inventorymanagement/
-				│   ├── config/
-				│   ├── controller/
-				│   ├── dto/
-				│   ├── model/
-				│   ├── repository/
-				│   └── service/
-				├── main/resources/      # application.yaml
-				└── test/                # Spring context test and H2 settings
+	├── postman/                # Importable collection and local environment
+	└── src/
+		├── main/java/com/inventorymanagement/
+		│   ├── config/
+		│   ├── controller/
+		│   ├── dto/
+		│   ├── exception/
+		│   ├── model/
+		│   ├── repository/
+		│   └── service/
+		├── main/resources/      # application.yaml and Flyway migrations
+		└── test/                # Spring context test and H2 settings
 ```
 
 ## Next Up
 
-- Connect the dashboard to the Spring API and replace sample state with persisted data.
-- Add product, warehouse, location, receipt, delivery, transfer, and adjustment endpoints.
-- Define the PostgreSQL schema and transaction-backed stock ledger.
-- Add Spring Security with JWT authentication and role-based access.
-- Add automated tests for inventory workflows and the frontend's key interactions.
+- Connect the dashboard to the Spring API and replace sample browser state with persisted data.
+- Configure real email delivery for password-reset OTPs; the local demo can expose a one-time code only when explicitly enabled.
+- Add role-based permissions beyond the current authenticated-request boundary.
+- Add automated workflow tests to the Gradle suite so the full Postman scenarios run in CI.

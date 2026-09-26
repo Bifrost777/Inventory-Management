@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 import com.inventorymanagement.model.Product;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
+  long countByDeletedAtIsNull();
+
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
     Optional<Product> findBySkuIgnoreCaseAndDeletedAtIsNull(String sku);

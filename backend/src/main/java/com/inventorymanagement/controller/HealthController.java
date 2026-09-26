@@ -2,6 +2,7 @@ package com.inventorymanagement.controller;
 
 import java.util.Map;
 
+import com.inventorymanagement.dto.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
     @GetMapping("/health")
-    public Map<String, String> health() {
-        return Map.of("status", "UP", "service", "inventory-management-api");
+    public ApiResponse<Map<String, String>> health() {
+        return ApiResponse.ok(Map.of("status", "UP", "service", "inventory-management-api"));
     }
 }
