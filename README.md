@@ -65,8 +65,8 @@ The codebase is split into a TypeScript frontend and a Java backend. The backend
 
 ### Requirements
 
-- Node.js 20.9 or newer and npm
-- Java 17 or newer and Maven 3.9+
+- Node.js 20.19+ or 22.13+ and npm
+- Java 17 or newer; the Gradle wrapper downloads the pinned Gradle distribution
 - PostgreSQL for running the API against the configured local database
 
 ### Frontend
@@ -85,7 +85,7 @@ Create a PostgreSQL database named `inventory_management`, then run:
 
 ```powershell
 cd backend
-mvn spring-boot:run
+.\gradlew.bat bootRun
 ```
 
 The API uses port `8080`. Override the local database connection with environment variables when needed:
@@ -94,7 +94,7 @@ The API uses port `8080`. Override the local database connection with environmen
 $env:DB_URL = "jdbc:postgresql://localhost:5432/inventory_management"
 $env:DB_USERNAME = "postgres"
 $env:DB_PASSWORD = "postgres"
-mvn spring-boot:run
+.\gradlew.bat bootRun
 ```
 
 Check the starter endpoint:
@@ -143,13 +143,13 @@ public Map<String, String> health() {
 ## Verify
 
 ```powershell
-# Frontend production build
+# Frontend production build (from the repository root)
 cd frontend
 npm run build
 
-# Backend context test
+# Backend context test (from the backend directory)
 cd ..\backend
-mvn test
+.\gradlew.bat test
 ```
 
 ## Project Layout
