@@ -53,7 +53,7 @@ public class ProductService {
     public PagedResponse<ProductResponseDto> list(String search, Long categoryId, Boolean lowStock,
                                                    Long warehouseId, Pageable pageable) {
         Page<Product> page;
-        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        String normalizedSearch = search == null || search.isBlank() ? "" : search.trim();
         if (warehouseId != null) {
             page = products.findByWarehouse(warehouseId, normalizedSearch, categoryId, pageable);
         } else if (Boolean.TRUE.equals(lowStock)) {

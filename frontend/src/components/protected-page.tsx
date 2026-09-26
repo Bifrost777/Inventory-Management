@@ -37,10 +37,9 @@ export function ProtectedPage({ title, children }: { title: string; children: Re
       return;
     }
     if (token === "local-demo-admin") {
-      setLocalDemo(true);
-      setUser(JSON.parse(localStorage.getItem("stockroom_demo_user") ?? "{\"name\":\"Demo Administrator\",\"email\":\"admin\",\"role\":\"INVENTORY_MANAGER\"}"));
-      setReady(true);
-      void api.warehouses().then(setWarehouses).catch(() => setWarehouses([]));
+      localStorage.removeItem("stockroom_token");
+      localStorage.removeItem("stockroom_demo_user");
+      router.replace("/login");
       return;
     }
     const savedTheme = localStorage.getItem("stockroom_theme") === "dark";

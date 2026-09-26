@@ -23,18 +23,6 @@ export default function LoginPage() {
     setBusy(true);
     setError("");
     try {
-      if (email.trim().toLowerCase() === "admin" && password === "1234") {
-        try {
-          const result = await api.login(email, password);
-          localStorage.setItem("stockroom_token", result.token);
-          localStorage.removeItem("stockroom_demo_user");
-        } catch {
-          localStorage.setItem("stockroom_token", "local-demo-admin");
-          localStorage.setItem("stockroom_demo_user", JSON.stringify({ name: "Demo Administrator", email: "admin", role: "INVENTORY_MANAGER" }));
-        }
-        router.replace("/");
-        return;
-      }
       const result = await api.login(email, password);
       localStorage.setItem("stockroom_token", result.token);
       localStorage.removeItem("stockroom_demo_user");
