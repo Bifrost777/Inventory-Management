@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: inventory-management-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory_management}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        "[format_sql]": true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    "[com.inventorymanagement]": INFO
